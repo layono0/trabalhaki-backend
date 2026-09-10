@@ -74,7 +74,7 @@ public class CandidateProfile {
     @Builder.Default
     private Integer completionPercentage = 0;
 
-    @OneToMany(mappedBy = "candidate", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "candidate", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @Builder.Default
     private List<CandidateSkill> skills = new ArrayList<>();
 

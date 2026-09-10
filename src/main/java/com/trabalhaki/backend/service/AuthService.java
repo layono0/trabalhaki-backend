@@ -12,6 +12,12 @@ import com.trabalhaki.backend.repository.RefreshTokenRepository;
 import com.trabalhaki.backend.repository.UserRepository;
 import com.trabalhaki.backend.security.JwtTokenProvider;
 import com.trabalhaki.backend.util.CnpjValidator;
+import com.trabalhaki.backend.domain.enums.PlanType;
+import com.trabalhaki.backend.domain.enums.VerificationStatus;
+import com.trabalhaki.backend.domain.model.CandidateProfile;
+import com.trabalhaki.backend.domain.model.Company;
+import com.trabalhaki.backend.repository.CandidateProfileRepository;
+import com.trabalhaki.backend.repository.CompanyRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -26,6 +32,8 @@ import java.util.UUID;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final CandidateProfileRepository candidateProfileRepository;
+    private final CompanyRepository companyRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
@@ -88,6 +96,14 @@ public class AuthService {
                 .build();
 
         User savedUser = userRepository.save(user);
+
+        CandidateProfile candidateProfile = CandidateProfile.builder()
+                .user(savedUser)
+                .name(request.getName().trim())
+                .completionPercentage(15) // Basic initial profile creation
+                .build();
+        candidateProfileRepository.save(candidateProfile);
+
         return createAuthResponse(savedUser);
     }
 
@@ -102,11 +118,26 @@ public class AuthService {
             throw new BusinessRuleException("CNPJ inválido estruturalmente");
         }
 
+        String cleanedCnpj = request.getCnpj().replaceAll("\\D", "");
+        if (companyRepository.existsByCnpj(cleanedCnpj)) {
+            throw new BusinessRuleException("CNPJ já cadastrado no sistema");
+        }
+
+        Company company = Company.builder()
+                .name(request.getCompanyName().trim())
+                .cnpj(cleanedCnpj)
+                .verificationStatus(VerificationStatus.UNVERIFIED)
+                .planType(PlanType.FREE)
+                .active(true)
+                .build();
+        Company savedCompany = companyRepository.save(company);
+
         User user = User.builder()
                 .email(email)
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(Role.COMPANY)
                 .companyRole(CompanyRole.ADMIN)
+                .companyId(savedCompany.getId())
                 .active(true)
                 .build();
 

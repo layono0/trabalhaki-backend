@@ -80,7 +80,7 @@ public class Job {
     @Builder.Default
     private List<String> benefits = new ArrayList<>();
 
-    @OneToMany(mappedBy = "job", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "job", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @Builder.Default
     private List<JobSkill> skills = new ArrayList<>();
 
