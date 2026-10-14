@@ -1,7 +1,6 @@
 package com.trabalhaki.backend;
 
 import com.trabalhaki.backend.domain.enums.JobStatus;
-import com.trabalhaki.backend.domain.enums.PlanType;
 import com.trabalhaki.backend.domain.enums.SkillType;
 import com.trabalhaki.backend.domain.enums.WorkModality;
 import com.trabalhaki.backend.domain.model.CandidateProfile;
@@ -16,13 +15,16 @@ import com.trabalhaki.backend.exception.BusinessRuleException;
 import com.trabalhaki.backend.repository.CandidateProfileRepository;
 import com.trabalhaki.backend.repository.CompanyRepository;
 import com.trabalhaki.backend.repository.JobRepository;
+import com.trabalhaki.backend.repository.UserRepository;
 import com.trabalhaki.backend.service.JobService;
 import com.trabalhaki.backend.service.LikeService;
 import com.trabalhaki.backend.service.MatchService;
 import com.trabalhaki.backend.service.MatchingAlgorithmService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -30,6 +32,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
+@Transactional
 class JobAndMatchBusinessRulesTest {
 
     @Autowired
@@ -54,7 +57,26 @@ class JobAndMatchBusinessRulesTest {
     private CandidateProfileRepository candidateProfileRepository;
 
     @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
     private com.trabalhaki.backend.service.AuthService authService;
+
+    /** Remove leftover test company before each test so CNPJ uniqueness holds across runs */
+    @BeforeEach
+    void cleanupTestData() {
+        // Clean up free-plan test company if it survived a previous non-transactional run
+        String testCnpj = "33592510000154";
+        companyRepository.findByCnpj(testCnpj).ifPresent(company -> {
+            // Delete associated jobs first to avoid FK constraint violations
+            jobRepository.findByCompany(company).forEach(jobRepository::delete);
+            // Delete associated users
+            userRepository.findAll().stream()
+                    .filter(u -> company.getId().equals(u.getCompanyId()))
+                    .forEach(userRepository::delete);
+            companyRepository.delete(company);
+        });
+    }
 
     @Test
     void shouldEnforceMaxThreeActiveJobsInFreePlan() {
@@ -108,7 +130,7 @@ class JobAndMatchBusinessRulesTest {
         String companyEmail = "empresa@trabalhaki.com";
         String candidateEmail = "candidato@trabalhaki.com";
 
-        // Create a new job
+        // Create a new job (empresa has 1 seeded + this = 2, within free limit)
         var createdJob = jobService.createJob(companyEmail, new CreateJobRequest(
                 "Desenvolvedor Flutter Match",
                 "Vaga para testar o fluxo de match com snapshots",
@@ -150,6 +172,7 @@ class JobAndMatchBusinessRulesTest {
         String companyEmail = "empresa@trabalhaki.com";
         String candidateEmail = "candidato@trabalhaki.com";
 
+        // empresa has 1 seeded job; create 1 more = 2 active (within free limit of 3)
         var createdJob = jobService.createJob(companyEmail, new CreateJobRequest(
                 "Vaga para Encerramento",
                 "Descrição da vaga que será fechada",
