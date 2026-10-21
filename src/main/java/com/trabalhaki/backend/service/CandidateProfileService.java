@@ -15,6 +15,7 @@ import com.trabalhaki.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +27,7 @@ public class CandidateProfileService {
     private final CandidateProfileRepository candidateProfileRepository;
     private final UserRepository userRepository;
     private final SkillRepository skillRepository;
+    private final FileStorageService fileStorageService;
 
     @Transactional(readOnly = true)
     public CandidateProfileResponse getProfileByEmail(String email) {
@@ -101,6 +103,19 @@ public class CandidateProfileService {
             }
         }
 
+        profile.setCompletionPercentage(calculateCompletionPercentage(profile));
+
+        CandidateProfile savedProfile = candidateProfileRepository.save(profile);
+        return mapToResponse(savedProfile);
+    }
+
+    @Transactional
+    public CandidateProfileResponse uploadPhoto(String email, MultipartFile file) {
+        User user = getUserByEmail(email);
+        CandidateProfile profile = getProfileByUser(user);
+
+        String photoUrl = fileStorageService.storeProfilePhoto(file);
+        profile.setPhotoUrl(photoUrl);
         profile.setCompletionPercentage(calculateCompletionPercentage(profile));
 
         CandidateProfile savedProfile = candidateProfileRepository.save(profile);

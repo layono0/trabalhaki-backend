@@ -8,11 +8,13 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/candidates")
@@ -37,6 +39,15 @@ public class CandidateProfileController {
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid @RequestBody UpdateCandidateProfileRequest request) {
         return ResponseEntity.ok(candidateProfileService.updateProfile(userDetails.getUsername(), request));
+    }
+
+    @PostMapping(value = "/profile/me/photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('CANDIDATE')")
+    @Operation(summary = "Upload seguro de foto de perfil para o candidato logado")
+    public ResponseEntity<CandidateProfileResponse> uploadPhoto(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(candidateProfileService.uploadPhoto(userDetails.getUsername(), file));
     }
 
     @GetMapping("/{id}/profile")

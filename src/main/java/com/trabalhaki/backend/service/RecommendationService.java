@@ -2,6 +2,7 @@ package com.trabalhaki.backend.service;
 
 import com.trabalhaki.backend.domain.enums.JobStatus;
 import com.trabalhaki.backend.domain.enums.Role;
+import com.trabalhaki.backend.domain.enums.WorkModality;
 import com.trabalhaki.backend.domain.model.CandidateProfile;
 import com.trabalhaki.backend.domain.model.Job;
 import com.trabalhaki.backend.domain.model.User;
@@ -19,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -37,6 +39,18 @@ public class RecommendationService {
 
     @Transactional(readOnly = true)
     public List<JobRecommendationResponse> getJobRecommendationsForCandidate(String candidateEmail) {
+        return getJobRecommendationsForCandidate(candidateEmail, null, null, null, null, null, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<JobRecommendationResponse> getJobRecommendationsForCandidate(
+            String candidateEmail,
+            WorkModality modality,
+            String state,
+            String city,
+            BigDecimal minSalary,
+            Integer page,
+            Integer size) {
         User user = userRepository.findByEmail(candidateEmail)
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
@@ -57,6 +71,26 @@ public class RecommendationService {
                 continue;
             }
 
+            // Optional filters
+            if (modality != null && job.getModality() != modality) {
+                continue;
+            }
+            if (state != null && !state.isBlank()) {
+                if (job.getState() == null || !job.getState().equalsIgnoreCase(state.trim())) {
+                    continue;
+                }
+            }
+            if (city != null && !city.isBlank()) {
+                if (job.getCity() == null || !job.getCity().equalsIgnoreCase(city.trim())) {
+                    continue;
+                }
+            }
+            if (minSalary != null) {
+                if (job.getMaximumSalary() == null || job.getMaximumSalary().compareTo(minSalary) < 0) {
+                    continue;
+                }
+            }
+
             CompatibilityResult compatibility = matchingAlgorithmService.calculateCompatibility(job, candidate);
             recommendations.add(new JobRecommendationResponse(
                     jobService.mapToResponse(job),
@@ -66,6 +100,13 @@ public class RecommendationService {
         }
 
         recommendations.sort(Comparator.comparingInt(JobRecommendationResponse::compatibilityScore).reversed());
+
+        if (page != null && size != null && size > 0 && page >= 0) {
+            int fromIndex = Math.min(page * size, recommendations.size());
+            int toIndex = Math.min(fromIndex + size, recommendations.size());
+            return new ArrayList<>(recommendations.subList(fromIndex, toIndex));
+        }
+
         return recommendations;
     }
 

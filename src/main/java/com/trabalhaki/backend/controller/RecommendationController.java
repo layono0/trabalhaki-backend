@@ -1,5 +1,6 @@
 package com.trabalhaki.backend.controller;
 
+import com.trabalhaki.backend.domain.enums.WorkModality;
 import com.trabalhaki.backend.dto.match.CandidateRecommendationResponse;
 import com.trabalhaki.backend.dto.match.JobRecommendationResponse;
 import com.trabalhaki.backend.service.RecommendationService;
@@ -13,6 +14,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -26,10 +28,17 @@ public class RecommendationController {
 
     @GetMapping("/jobs")
     @PreAuthorize("hasRole('CANDIDATE')")
-    @Operation(summary = "Obter vagas recomendadas ordenadas por compatibilidade (0-100%) para o candidato logado")
+    @Operation(summary = "Obter vagas recomendadas ordenadas por compatibilidade (0-100%) para o candidato logado com filtros e paginação")
     public ResponseEntity<List<JobRecommendationResponse>> getJobRecommendations(
-            @AuthenticationPrincipal UserDetails userDetails) {
-        return ResponseEntity.ok(recommendationService.getJobRecommendationsForCandidate(userDetails.getUsername()));
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(required = false) WorkModality modality,
+            @RequestParam(required = false) String state,
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) BigDecimal minSalary,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        return ResponseEntity.ok(recommendationService.getJobRecommendationsForCandidate(
+                userDetails.getUsername(), modality, state, city, minSalary, page, size));
     }
 
     @GetMapping("/candidates")

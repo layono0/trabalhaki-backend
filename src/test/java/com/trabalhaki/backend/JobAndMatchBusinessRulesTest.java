@@ -24,6 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -32,6 +33,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
+@ActiveProfiles("test")
 @Transactional
 class JobAndMatchBusinessRulesTest {
 
@@ -46,6 +48,9 @@ class JobAndMatchBusinessRulesTest {
 
     @Autowired
     private MatchingAlgorithmService matchingAlgorithmService;
+
+    @Autowired
+    private com.trabalhaki.backend.service.RecommendationService recommendationService;
 
     @Autowired
     private JobRepository jobRepository;
@@ -213,5 +218,41 @@ class JobAndMatchBusinessRulesTest {
         assertNotNull(result.explanation().get("experience"));
         assertNotNull(result.explanation().get("salary"));
         assertNotNull(result.explanation().get("modality"));
+    }
+
+    @Test
+    void shouldFilterAndPaginateJobRecommendationsForCandidate() {
+        String candidateEmail = "candidato@trabalhaki.com";
+
+        // Query with REMOTE modality (seeded job is REMOTE)
+        List<com.trabalhaki.backend.dto.match.JobRecommendationResponse> remoteJobs =
+                recommendationService.getJobRecommendationsForCandidate(
+                        candidateEmail, WorkModality.REMOTE, null, null, null, 0, 10);
+        assertFalse(remoteJobs.isEmpty());
+        assertEquals(WorkModality.REMOTE, remoteJobs.get(0).job().modality());
+
+        // Query with ONSITE modality (should find 0 jobs since seeded is REMOTE)
+        List<com.trabalhaki.backend.dto.match.JobRecommendationResponse> onsiteJobs =
+                recommendationService.getJobRecommendationsForCandidate(
+                        candidateEmail, WorkModality.ONSITE, null, null, null, 0, 10);
+        assertTrue(onsiteJobs.isEmpty());
+
+        // Query with minSalary that exceeds budget (R$ 50.000,00)
+        List<com.trabalhaki.backend.dto.match.JobRecommendationResponse> expensiveJobs =
+                recommendationService.getJobRecommendationsForCandidate(
+                        candidateEmail, null, null, null, new BigDecimal("50000.00"), 0, 10);
+        assertTrue(expensiveJobs.isEmpty());
+
+        // Query with pagination (page=0, size=1)
+        List<com.trabalhaki.backend.dto.match.JobRecommendationResponse> pagedJobs =
+                recommendationService.getJobRecommendationsForCandidate(
+                        candidateEmail, null, null, null, null, 0, 1);
+        assertEquals(1, pagedJobs.size());
+
+        // Query beyond available pages (page=99, size=1)
+        List<com.trabalhaki.backend.dto.match.JobRecommendationResponse> emptyPage =
+                recommendationService.getJobRecommendationsForCandidate(
+                        candidateEmail, null, null, null, null, 99, 1);
+        assertTrue(emptyPage.isEmpty());
     }
 }

@@ -6,7 +6,9 @@ import com.trabalhaki.backend.dto.auth.LoginRequest;
 import com.trabalhaki.backend.dto.auth.LoginResponse;
 import com.trabalhaki.backend.dto.auth.RefreshTokenRequest;
 import com.trabalhaki.backend.dto.auth.RegisterCandidateRequest;
+import com.trabalhaki.backend.repository.CandidateProfileRepository;
 import com.trabalhaki.backend.repository.CompanyRepository;
+import com.trabalhaki.backend.repository.RefreshTokenRepository;
 import com.trabalhaki.backend.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,9 +22,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@ActiveProfiles("test")
 class AuthControllerTest {
 
     @Autowired
@@ -34,20 +39,33 @@ class AuthControllerTest {
     @Autowired
     private CompanyRepository companyRepository;
 
+    @Autowired
+    private RefreshTokenRepository refreshTokenRepository;
+
+    @Autowired
+    private CandidateProfileRepository candidateProfileRepository;
+
+    @Autowired
+    private org.springframework.transaction.support.TransactionTemplate transactionTemplate;
+
     private final ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
 
     @BeforeEach
     void cleanupTestUsers() {
-        // Remove test-specific users so registration tests always start clean
-        deleteUserAndCompany("novo.candidato@trabalhaki.com");
-        deleteUserAndCompany("rh@inovatech.com");
-        deleteUserAndCompany("rh2@inovatech.com");
-        // Also remove the InovaTech company by CNPJ if it exists as an orphan
-        companyRepository.findByCnpj("00000000000191").ifPresent(companyRepository::delete);
+        transactionTemplate.executeWithoutResult(status -> {
+            // Remove test-specific users so registration tests always start clean
+            deleteUserAndCompany("novo.candidato@trabalhaki.com");
+            deleteUserAndCompany("rh@inovatech.com");
+            deleteUserAndCompany("rh2@inovatech.com");
+            // Also remove the InovaTech company by CNPJ if it exists as an orphan
+            companyRepository.findByCnpj("00000000000191").ifPresent(companyRepository::delete);
+        });
     }
 
     private void deleteUserAndCompany(String email) {
         userRepository.findByEmail(email).ifPresent(user -> {
+            refreshTokenRepository.deleteByUser(user);
+            candidateProfileRepository.findByUser(user).ifPresent(candidateProfileRepository::delete);
             if (user.getCompanyId() != null) {
                 companyRepository.findById(user.getCompanyId()).ifPresent(companyRepository::delete);
             }
