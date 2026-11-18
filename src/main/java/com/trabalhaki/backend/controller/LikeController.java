@@ -14,6 +14,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/likes")
@@ -41,6 +42,28 @@ public class LikeController {
             @PathVariable Long jobId,
             @PathVariable Long candidateId) {
         return ResponseEntity.ok(likeService.companyLikeCandidate(userDetails.getUsername(), jobId, candidateId));
+    }
+
+    @PostMapping("/company/job/{jobId}/candidate/{candidateId}/pass")
+    @PreAuthorize("hasRole('COMPANY')")
+    @Operation(summary = "Empresa descarta um candidato no swipe da vaga")
+    public ResponseEntity<Map<String, String>> companyPassCandidate(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long jobId,
+            @PathVariable Long candidateId) {
+        likeService.companyPassCandidate(userDetails.getUsername(), jobId, candidateId);
+        return ResponseEntity.ok(Map.of("message", "Candidato descartado para esta vaga."));
+    }
+
+    @DeleteMapping("/company/job/{jobId}/candidate/{candidateId}/pass")
+    @PreAuthorize("hasRole('COMPANY')")
+    @Operation(summary = "Desfaz o descarte de um candidato no swipe da vaga")
+    public ResponseEntity<Map<String, String>> undoCompanyPassCandidate(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long jobId,
+            @PathVariable Long candidateId) {
+        likeService.undoCompanyPassCandidate(userDetails.getUsername(), jobId, candidateId);
+        return ResponseEntity.ok(Map.of("message", "Descarte desfeito com sucesso."));
     }
 
     @GetMapping("/candidate/my")

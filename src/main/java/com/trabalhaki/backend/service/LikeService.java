@@ -24,6 +24,8 @@ public class LikeService {
 
     private final CandidateLikeRepository candidateLikeRepository;
     private final CompanyLikeRepository companyLikeRepository;
+    private final CompanyPassRepository companyPassRepository;
+    private final JobMatchRepository jobMatchRepository;
     private final JobRepository jobRepository;
     private final CandidateProfileRepository candidateProfileRepository;
     private final UserRepository userRepository;
@@ -94,6 +96,10 @@ public class LikeService {
         CandidateProfile candidate = candidateProfileRepository.findById(candidateId)
                 .orElseThrow(() -> new ResourceNotFoundException("Candidato não encontrado com ID: " + candidateId));
 
+        // If previously passed by this company for this job, clear the pass before liking
+        companyPassRepository.findByCompanyAndJobAndCandidate(job.getCompany(), job, candidate)
+                .ifPresent(companyPassRepository::delete);
+
         // Check if company already liked this candidate for this job
         Optional<CompanyLike> existingLike = companyLikeRepository.findByCompanyAndJobAndCandidate(job.getCompany(), job, candidate);
         if (existingLike.isEmpty()) {
@@ -113,6 +119,66 @@ public class LikeService {
         }
 
         return new LikeResponse(false, null, "Interesse registrado. Aguardando reciprocidade do candidato.");
+    }
+
+    @Transactional
+    public void companyPassCandidate(String companyEmail, Long jobId, Long candidateId) {
+        User user = userRepository.findByEmail(companyEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+
+        if (user.getRole() != Role.COMPANY) {
+            throw new UnauthorizedException("Apenas empresas podem descartar candidatos");
+        }
+
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new ResourceNotFoundException("Vaga não encontrada com ID: " + jobId));
+
+        if (!job.getCompany().getId().equals(user.getCompanyId())) {
+            throw new UnauthorizedException("Apenas a empresa dona da vaga pode descartar candidatos para ela");
+        }
+
+        if (job.getStatus() == JobStatus.CLOSED) {
+            throw new BusinessRuleException("Esta vaga está encerrada e não aceita mais interações");
+        }
+
+        CandidateProfile candidate = candidateProfileRepository.findById(candidateId)
+                .orElseThrow(() -> new ResourceNotFoundException("Candidato não encontrado com ID: " + candidateId));
+
+        if (jobMatchRepository.findByJobAndCandidate(job, candidate).isPresent()) {
+            throw new BusinessRuleException("Já existe um match confirmado para este candidato nesta vaga");
+        }
+
+        if (companyPassRepository.findByCompanyAndJobAndCandidate(job.getCompany(), job, candidate).isEmpty()) {
+            CompanyPass pass = CompanyPass.builder()
+                    .company(job.getCompany())
+                    .job(job)
+                    .candidate(candidate)
+                    .build();
+            companyPassRepository.save(pass);
+        }
+    }
+
+    @Transactional
+    public void undoCompanyPassCandidate(String companyEmail, Long jobId, Long candidateId) {
+        User user = userRepository.findByEmail(companyEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+
+        if (user.getRole() != Role.COMPANY) {
+            throw new UnauthorizedException("Apenas empresas podem desfazer descartes");
+        }
+
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new ResourceNotFoundException("Vaga não encontrada com ID: " + jobId));
+
+        if (!job.getCompany().getId().equals(user.getCompanyId())) {
+            throw new UnauthorizedException("Apenas a empresa dona da vaga pode desfazer descartes desta vaga");
+        }
+
+        CandidateProfile candidate = candidateProfileRepository.findById(candidateId)
+                .orElseThrow(() -> new ResourceNotFoundException("Candidato não encontrado com ID: " + candidateId));
+
+        companyPassRepository.findByCompanyAndJobAndCandidate(job.getCompany(), job, candidate)
+                .ifPresent(companyPassRepository::delete);
     }
 
     @Transactional(readOnly = true)

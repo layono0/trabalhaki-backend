@@ -179,6 +179,9 @@ public class MatchService {
 
     private MatchResponse mapToResponse(JobMatch match) {
         CompatibilityResult result = matchingAlgorithmService.calculateCompatibility(match.getJob(), match.getCandidate());
+        ProcessStatus processStatus = selectionProcessRepository.findByMatch(match)
+                .map(SelectionProcess::getStatus)
+                .orElse(ProcessStatus.MATCHED);
 
         return new MatchResponse(
                 match.getId(),
@@ -191,7 +194,10 @@ public class MatchService {
                 match.getCandidate().getPhotoUrl(),
                 result.score(),
                 result.explanationJson(),
-                match.getCreatedAt()
+                match.getCreatedAt(),
+                match.getJobSnapshotJson(),
+                match.getCandidateSnapshotJson(),
+                processStatus
         );
     }
 }

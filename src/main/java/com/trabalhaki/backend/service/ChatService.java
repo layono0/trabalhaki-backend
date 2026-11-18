@@ -107,7 +107,8 @@ public class ChatService {
                 message.getSender().getId(),
                 senderName,
                 message.getText(),
-                message.getCreatedAt()
+                message.getCreatedAt(),
+                message.getSenderRole()
         );
     }
 }

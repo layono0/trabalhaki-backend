@@ -28,7 +28,9 @@ public record JobResponse(
         List<String> benefits,
         List<JobSkillResponse> skills,
         Integer version,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        long totalApplicantsCount,
+        long pendingApplicantsCount
 ) {
     public record JobSkillResponse(String skillName, SkillType skillType) {}
 }

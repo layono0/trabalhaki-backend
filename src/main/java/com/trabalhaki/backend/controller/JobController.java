@@ -1,9 +1,11 @@
 package com.trabalhaki.backend.controller;
 
 import com.trabalhaki.backend.dto.job.CreateJobRequest;
+import com.trabalhaki.backend.dto.job.JobApplicantResponse;
 import com.trabalhaki.backend.dto.job.JobResponse;
 import com.trabalhaki.backend.dto.job.UpdateJobRequest;
 import com.trabalhaki.backend.service.JobService;
+import com.trabalhaki.backend.service.RecommendationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,6 +28,7 @@ import java.util.List;
 public class JobController {
 
     private final JobService jobService;
+    private final RecommendationService recommendationService;
 
     @PostMapping
     @PreAuthorize("hasRole('COMPANY')")
@@ -73,5 +76,14 @@ public class JobController {
             @AuthenticationPrincipal UserDetails userDetails,
             @PathVariable Long id) {
         return ResponseEntity.ok(jobService.closeJob(userDetails.getUsername(), id));
+    }
+
+    @GetMapping("/{id}/applicants")
+    @PreAuthorize("hasRole('COMPANY')")
+    @Operation(summary = "Listar candidatos que curtiram esta vaga e aguardam avaliação no swipe da empresa")
+    public ResponseEntity<List<JobApplicantResponse>> getJobApplicants(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @PathVariable Long id) {
+        return ResponseEntity.ok(recommendationService.getApplicantsForJob(userDetails.getUsername(), id));
     }
 }

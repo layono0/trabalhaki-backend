@@ -260,6 +260,25 @@ CREATE TABLE company_likes (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------------------------
+-- 11.1 TABELA: company_passes (Descarte Unilateral: Empresa + Vaga -> Candidato)
+-- ------------------------------------------------------------------------------
+DROP TABLE IF EXISTS company_passes;
+CREATE TABLE company_passes (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    company_id BIGINT NOT NULL,
+    job_id BIGINT NOT NULL,
+    candidate_id BIGINT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT uk_company_job_candidate_pass UNIQUE (company_id, job_id, candidate_id),
+    CONSTRAINT fk_comp_passes_company FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE,
+    CONSTRAINT fk_comp_passes_job FOREIGN KEY (job_id) REFERENCES jobs (id) ON DELETE CASCADE,
+    CONSTRAINT fk_comp_passes_candidate FOREIGN KEY (candidate_id) REFERENCES candidate_profiles (id) ON DELETE CASCADE,
+    INDEX idx_comp_passes_company (company_id),
+    INDEX idx_comp_passes_job_candidate (job_id, candidate_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------------------------
 -- 12. TABELA: job_matches (Match Recíproco com Snapshots Imutáveis Congelados)
 -- Seções 19, 21 e 24 do plano
 -- ------------------------------------------------------------------------------

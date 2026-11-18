@@ -11,11 +11,13 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -42,6 +44,15 @@ public class CompanyController {
             @AuthenticationPrincipal UserDetails userDetails,
             @Valid @RequestBody UpdateCompanyRequest request) {
         return ResponseEntity.ok(companyService.updateMyCompany(userDetails.getUsername(), request));
+    }
+
+    @PostMapping(value = "/me/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('COMPANY') and hasRole('ADMIN')")
+    @Operation(summary = "Upload seguro do logotipo da empresa (exclusivo para ADMIN da empresa)")
+    public ResponseEntity<CompanyResponse> uploadLogo(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(companyService.uploadLogo(userDetails.getUsername(), file));
     }
 
     @PostMapping("/members")

@@ -1,5 +1,7 @@
 package com.trabalhaki.backend.dto.match;
 
+import com.trabalhaki.backend.domain.enums.ProcessStatus;
+
 import java.time.LocalDateTime;
 
 public record MatchResponse(
@@ -13,5 +15,8 @@ public record MatchResponse(
         String candidatePhotoUrl,
         Integer compatibilityScore,
         String compatibilityExplanationJson,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        String jobSnapshotJson,
+        String candidateSnapshotJson,
+        ProcessStatus processStatus
 ) {}

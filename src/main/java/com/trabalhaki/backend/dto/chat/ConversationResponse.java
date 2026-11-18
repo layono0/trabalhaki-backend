@@ -1,5 +1,7 @@
 package com.trabalhaki.backend.dto.chat;
 
+import com.trabalhaki.backend.domain.enums.Role;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -13,6 +15,7 @@ public record ConversationResponse(
             Long senderId,
             String senderName,
             String content,
-            LocalDateTime createdAt
+            LocalDateTime createdAt,
+            Role senderRole
     ) {}
 }

@@ -4,6 +4,7 @@ import com.trabalhaki.backend.domain.enums.JobStatus;
 import com.trabalhaki.backend.domain.enums.PlanType;
 import com.trabalhaki.backend.domain.enums.Role;
 import com.trabalhaki.backend.domain.enums.WorkModality;
+import com.trabalhaki.backend.domain.model.CandidateLike;
 import com.trabalhaki.backend.domain.model.Company;
 import com.trabalhaki.backend.domain.model.Job;
 import com.trabalhaki.backend.domain.model.JobSkill;
@@ -16,7 +17,11 @@ import com.trabalhaki.backend.dto.job.UpdateJobRequest;
 import com.trabalhaki.backend.exception.BusinessRuleException;
 import com.trabalhaki.backend.exception.ResourceNotFoundException;
 import com.trabalhaki.backend.exception.UnauthorizedException;
+import com.trabalhaki.backend.repository.CandidateLikeRepository;
+import com.trabalhaki.backend.repository.CompanyLikeRepository;
+import com.trabalhaki.backend.repository.CompanyPassRepository;
 import com.trabalhaki.backend.repository.CompanyRepository;
+import com.trabalhaki.backend.repository.JobMatchRepository;
 import com.trabalhaki.backend.repository.JobRepository;
 import com.trabalhaki.backend.repository.SkillRepository;
 import com.trabalhaki.backend.repository.UserRepository;
@@ -37,6 +42,10 @@ public class JobService {
     private final CompanyRepository companyRepository;
     private final UserRepository userRepository;
     private final SkillRepository skillRepository;
+    private final CandidateLikeRepository candidateLikeRepository;
+    private final CompanyLikeRepository companyLikeRepository;
+    private final CompanyPassRepository companyPassRepository;
+    private final JobMatchRepository jobMatchRepository;
 
     @Transactional
     public JobResponse createJob(String userEmail, CreateJobRequest request) {
@@ -253,6 +262,18 @@ public class JobService {
             }
         }
 
+        long totalApplicantsCount = 0L;
+        long pendingApplicantsCount = 0L;
+        if (job.getId() != null) {
+            List<CandidateLike> likes = candidateLikeRepository.findByJob(job);
+            totalApplicantsCount = likes.size();
+            pendingApplicantsCount = likes.stream()
+                    .filter(like -> !companyLikeRepository.existsByCompanyAndJobAndCandidate(job.getCompany(), job, like.getCandidate())
+                            && !companyPassRepository.existsByCompanyAndJobAndCandidate(job.getCompany(), job, like.getCandidate())
+                            && jobMatchRepository.findByJobAndCandidate(job, like.getCandidate()).isEmpty())
+                    .count();
+        }
+
         return new JobResponse(
                 job.getId(),
                 job.getCompany().getId(),
@@ -273,7 +294,9 @@ public class JobService {
                 job.getBenefits() != null ? new ArrayList<>(job.getBenefits()) : List.of(),
                 skillResponses,
                 job.getVersion(),
-                job.getCreatedAt()
+                job.getCreatedAt(),
+                totalApplicantsCount,
+                pendingApplicantsCount
         );
     }
 }

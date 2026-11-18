@@ -3,9 +3,11 @@ package com.trabalhaki.backend.service;
 import com.trabalhaki.backend.domain.enums.JobStatus;
 import com.trabalhaki.backend.domain.enums.Role;
 import com.trabalhaki.backend.domain.enums.WorkModality;
+import com.trabalhaki.backend.domain.model.CandidateLike;
 import com.trabalhaki.backend.domain.model.CandidateProfile;
 import com.trabalhaki.backend.domain.model.Job;
 import com.trabalhaki.backend.domain.model.User;
+import com.trabalhaki.backend.dto.job.JobApplicantResponse;
 import com.trabalhaki.backend.dto.match.CandidateRecommendationResponse;
 import com.trabalhaki.backend.dto.match.CompatibilityResult;
 import com.trabalhaki.backend.dto.match.JobRecommendationResponse;
@@ -14,6 +16,8 @@ import com.trabalhaki.backend.exception.UnauthorizedException;
 import com.trabalhaki.backend.repository.CandidateLikeRepository;
 import com.trabalhaki.backend.repository.CandidateProfileRepository;
 import com.trabalhaki.backend.repository.CompanyLikeRepository;
+import com.trabalhaki.backend.repository.CompanyPassRepository;
+import com.trabalhaki.backend.repository.JobMatchRepository;
 import com.trabalhaki.backend.repository.JobRepository;
 import com.trabalhaki.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +38,8 @@ public class RecommendationService {
     private final UserRepository userRepository;
     private final CandidateLikeRepository candidateLikeRepository;
     private final CompanyLikeRepository companyLikeRepository;
+    private final CompanyPassRepository companyPassRepository;
+    private final JobMatchRepository jobMatchRepository;
     private final MatchingAlgorithmService matchingAlgorithmService;
     private final JobService jobService;
 
@@ -160,5 +166,68 @@ public class RecommendationService {
 
         recommendations.sort(Comparator.comparingInt(CandidateRecommendationResponse::compatibilityScore).reversed());
         return recommendations;
+    }
+
+    @Transactional(readOnly = true)
+    public List<JobApplicantResponse> getApplicantsForJob(String userEmail, Long jobId) {
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+
+        if (user.getRole() != Role.COMPANY) {
+            throw new UnauthorizedException("Apenas usuários empresariais podem visualizar candidatos da vaga");
+        }
+
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new ResourceNotFoundException("Vaga não encontrada com ID: " + jobId));
+
+        if (!job.getCompany().getId().equals(user.getCompanyId())) {
+            throw new UnauthorizedException("Apenas a empresa proprietária da vaga pode visualizar os candidatos interessados");
+        }
+
+        List<CandidateLike> likes = candidateLikeRepository.findByJob(job);
+        List<JobApplicantResponse> applicants = new ArrayList<>();
+
+        for (CandidateLike like : likes) {
+            CandidateProfile candidate = like.getCandidate();
+            if (companyLikeRepository.existsByCompanyAndJobAndCandidate(job.getCompany(), job, candidate)
+                    || companyPassRepository.existsByCompanyAndJobAndCandidate(job.getCompany(), job, candidate)
+                    || jobMatchRepository.findByJobAndCandidate(job, candidate).isPresent()) {
+                continue;
+            }
+
+            CompatibilityResult compatibility = matchingAlgorithmService.calculateCompatibility(job, candidate);
+            List<String> skillNames = candidate.getSkills() == null ? List.of() :
+                    candidate.getSkills().stream()
+                            .filter(cs -> cs.getSkill() != null)
+                            .map(cs -> cs.getSkill().getName())
+                            .toList();
+
+            applicants.add(new JobApplicantResponse(
+                    candidate.getId(),
+                    candidate.getName(),
+                    candidate.getPhotoUrl(),
+                    candidate.getDesiredRole(),
+                    candidate.getArea(),
+                    candidate.getExperienceYears(),
+                    candidate.getEducation(),
+                    candidate.getCity(),
+                    candidate.getState(),
+                    candidate.getCountry(),
+                    candidate.getPreferredModality(),
+                    candidate.getPreferredContractType(),
+                    candidate.getMinimumSalaryExpectation(),
+                    candidate.getCompletionPercentage(),
+                    skillNames,
+                    compatibility.score(),
+                    compatibility.explanation(),
+                    like.getCreatedAt()
+            ));
+        }
+
+        applicants.sort(
+                Comparator.comparingInt(JobApplicantResponse::compatibilityScore).reversed()
+                        .thenComparing(JobApplicantResponse::appliedAt, Comparator.nullsLast(Comparator.reverseOrder()))
+        );
+        return applicants;
     }
 }

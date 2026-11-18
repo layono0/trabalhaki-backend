@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -27,6 +28,7 @@ public class CompanyService {
     private final CompanyRepository companyRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final FileStorageService fileStorageService;
 
     @Transactional(readOnly = true)
     public CompanyResponse getMyCompany(String email) {
@@ -81,6 +83,19 @@ public class CompanyService {
         if (request.longitude() != null) {
             company.setLongitude(request.longitude());
         }
+
+        Company savedCompany = companyRepository.save(company);
+        return mapToResponse(savedCompany);
+    }
+
+    @Transactional
+    public CompanyResponse uploadLogo(String email, MultipartFile file) {
+        User user = getCompanyUser(email);
+        requireAdmin(user);
+
+        Company company = getCompanyEntity(user.getCompanyId());
+        String logoUrl = fileStorageService.storeProfilePhoto(file);
+        company.setLogoUrl(logoUrl);
 
         Company savedCompany = companyRepository.save(company);
         return mapToResponse(savedCompany);
