@@ -2,6 +2,7 @@ package com.trabalhaki.backend;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.trabalhaki.backend.config.CertValidatorProcessManager;
 import com.trabalhaki.backend.domain.enums.SkillType;
 import com.trabalhaki.backend.domain.enums.WorkModality;
 import com.trabalhaki.backend.dto.auth.LoginRequest;
@@ -21,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.net.ServerSocket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -58,9 +60,9 @@ class CertificateVerificationIntegrationTest {
     }
 
     private byte[] generateSamplePdfViaPython(String expression) throws Exception {
-        Path validatorDir = Paths.get("../trabalhaki-cert-validator").toAbsolutePath().normalize();
+        Path validatorDir = Paths.get("trabalhaki-cert-validator").toAbsolutePath().normalize();
         if (!Files.isDirectory(validatorDir)) {
-            validatorDir = Paths.get("trabalhaki-cert-validator").toAbsolutePath().normalize();
+            validatorDir = Paths.get("../trabalhaki-cert-validator").toAbsolutePath().normalize();
         }
         ProcessBuilder pb = new ProcessBuilder(
                 "python3",
@@ -164,5 +166,34 @@ class CertificateVerificationIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accepted").value(false))
                 .andExpect(jsonPath("$.rejectionReasons[0]", containsString("João Silva")));
+    }
+
+    @Test
+    void shouldStartAndStopEmbeddedPythonValidatorProcessCleanly() throws Exception {
+        int freePort;
+        try (ServerSocket socket = new ServerSocket(0)) {
+            freePort = socket.getLocalPort();
+        }
+
+        CertValidatorProcessManager manager = new CertValidatorProcessManager(
+                true,
+                freePort,
+                "http://localhost:" + freePort,
+                "trabalhaki-cert-validator",
+                "python3",
+                8000L
+        );
+
+        try {
+            manager.start();
+            assertTrue(manager.isRunning(), "Gerenciador deveria estar ativo");
+            assertTrue(manager.isManagedProcessAlive(), "Processo Python embarcado deveria estar em execução");
+            assertTrue(manager.isHealthy(), "Endpoint /health do validador embarcado deveria responder 200");
+        } finally {
+            manager.stop();
+        }
+
+        assertFalse(manager.isRunning(), "Gerenciador deveria estar parado após stop()");
+        assertFalse(manager.isManagedProcessAlive(), "Processo Python deveria ser encerrado sem órfãos");
     }
 }

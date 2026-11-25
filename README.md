@@ -27,17 +27,18 @@ O servidor segue arquitetura em camadas bem definidas (`controller` → `service
 trabalhaki-backend/
 ├── pom.xml                                  # Dependências Maven (Spring Web, JPA, Security, JJWT, SpringDoc)
 ├── schema.sql                               # Script DDL completo das 16 tabelas relacionais + seeds
+├── trabalhaki-cert-validator/               # Microserviço Python embarcado de validação antifraude de certificados
 └── src/
     ├── main/java/com/trabalhaki/backend/
-    │   ├── config/                          # SecurityConfig, DataInitializer (dados de demonstração)
+    │   ├── config/                          # SecurityConfig, DataInitializer, CertValidatorProcessManager
     │   ├── controller/                      # 10 Controllers REST (/api/v1/*)
     │   ├── domain/                          # 16 Entidades JPA e 8 Enums de domínio
     │   ├── dto/                             # DTOs de entrada e resposta validados com Bean Validation
     │   ├── exception/                       # GlobalExceptionHandler e exceções de regra de negócio
     │   ├── repository/                      # 14 repositórios Spring Data JPA
     │   ├── security/                        # JwtTokenProvider, filtro JWT e UserDetailsService
-    │   └── service/                         # MatchingAlgorithmService, LikeService, MatchService, ChatService, etc.
-    └── test/java/com/trabalhaki/backend/    # 23 testes automatizados (JUnit 5 + MockMvc)
+    │   └── service/                         # MatchingAlgorithmService, CertificateVerificationService, LikeService, etc.
+    └── test/java/com/trabalhaki/backend/    # Suíte automatizada (JUnit 5 + MockMvc)
 ```
 
 ---
@@ -76,6 +77,7 @@ O serviço `MatchingAlgorithmService` calcula uma pontuação determinística e 
 
 ### Pré-requisitos
 - JDK 21 (`JAVA_HOME` configurado)
+- Python 3 + Flask (`pip install -r trabalhaki-cert-validator/requirements.txt`) — iniciado automaticamente junto com o back-end na porta `8090` (`cert.validator.auto-start=true`)
 - Opcional: MariaDB 10.5+ (ou usar o perfil em memória `h2` sem instalação externa)
 
 ### Comandos

@@ -2,6 +2,7 @@ package com.trabalhaki.backend.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.trabalhaki.backend.config.CertValidatorProcessManager;
 import com.trabalhaki.backend.domain.enums.Role;
 import com.trabalhaki.backend.domain.model.*;
 import com.trabalhaki.backend.dto.candidate.CandidateCertificateResponse;
@@ -16,7 +17,6 @@ import com.trabalhaki.backend.repository.SkillRepository;
 import com.trabalhaki.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -31,7 +31,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -51,13 +50,8 @@ public class CertificateVerificationService {
     private final CandidateProfileRepository candidateProfileRepository;
     private final CandidateCertificateRepository candidateCertificateRepository;
     private final SkillRepository skillRepository;
+    private final CertValidatorProcessManager certValidatorProcessManager;
     private final ObjectMapper objectMapper = new ObjectMapper();
-
-    @Value("${cert.validator.url:http://localhost:8090}")
-    private String validatorBaseUrl;
-
-    @Value("${cert.validator.python-dir:../trabalhaki-cert-validator}")
-    private String validatorPythonDir;
 
     @Transactional(readOnly = true)
     public List<CandidateCertificateResponse> listMyCertificates(String email) {
@@ -243,6 +237,8 @@ public class CertificateVerificationService {
                 ? originalFilename
                 : "certificate.pdf";
 
+        String validatorBaseUrl = certValidatorProcessManager.getValidatorBaseUrl();
+
         // 1. Try Python HTTP microservice first if running
         try {
             SimpleClientHttpRequestFactory rf = new SimpleClientHttpRequestFactory();
@@ -289,8 +285,9 @@ public class CertificateVerificationService {
             tempFile = Files.createTempFile("trabalhaki-cert-", suffix);
             Files.write(tempFile, fileBytes);
 
+            Path validatorDir = certValidatorProcessManager.resolveValidatorDirectory();
             List<String> cmd = new ArrayList<>();
-            cmd.add("python3");
+            cmd.add(certValidatorProcessManager.resolvePythonExecutable(validatorDir));
             cmd.add("-m");
             cmd.add("cert_validator.cli");
             cmd.add("validate");
@@ -304,7 +301,7 @@ public class CertificateVerificationService {
             }
 
             ProcessBuilder pb = new ProcessBuilder(cmd);
-            pb.directory(resolveValidatorDirectory().toFile());
+            pb.directory(validatorDir.toFile());
             pb.redirectErrorStream(false);
 
             Process process = pb.start();
@@ -334,22 +331,6 @@ public class CertificateVerificationService {
                 }
             }
         }
-    }
-
-    private Path resolveValidatorDirectory() {
-        Path configured = Paths.get(validatorPythonDir).toAbsolutePath().normalize();
-        if (Files.isDirectory(configured)) {
-            return configured;
-        }
-        Path sibling = Paths.get("../trabalhaki-cert-validator").toAbsolutePath().normalize();
-        if (Files.isDirectory(sibling)) {
-            return sibling;
-        }
-        Path child = Paths.get("trabalhaki-cert-validator").toAbsolutePath().normalize();
-        if (Files.isDirectory(child)) {
-            return child;
-        }
-        return configured;
     }
 
     private CandidateProfile getCandidateProfileByEmail(String email) {
