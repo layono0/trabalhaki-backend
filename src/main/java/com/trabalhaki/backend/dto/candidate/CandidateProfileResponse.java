@@ -24,5 +24,8 @@ public record CandidateProfileResponse(
         Integer completionPercentage,
         List<String> skills,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        List<String> verifiedSkills,
+        int priorityBonusTotal,
+        int verifiedCertificatesCount
 ) {}

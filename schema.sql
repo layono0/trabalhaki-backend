@@ -370,6 +370,31 @@ CREATE TABLE selection_process_histories (
     INDEX idx_proc_hist_process_date (selection_process_id, changed_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ------------------------------------------------------------------------------
+-- 17. TABELA: candidate_certificates (Certificados Validados & Prioridade)
+-- ------------------------------------------------------------------------------
+DROP TABLE IF EXISTS candidate_certificates;
+CREATE TABLE candidate_certificates (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    candidate_id BIGINT NOT NULL,
+    file_sha256 VARCHAR(64) NOT NULL UNIQUE,
+    credential_code VARCHAR(180) NULL,
+    course_title VARCHAR(200) NULL,
+    institution_name VARCHAR(150) NOT NULL,
+    institution_tier INT NOT NULL,
+    verified_skills_csv VARCHAR(500) NOT NULL,
+    workload_hours INT NULL,
+    priority_bonus INT NOT NULL,
+    trust_score INT NOT NULL,
+    fraud_risk_score INT NOT NULL,
+    verification_summary VARCHAR(500) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_cand_cert_candidate FOREIGN KEY (candidate_id) REFERENCES candidate_profiles (id) ON DELETE CASCADE,
+    INDEX idx_cand_cert_candidate (candidate_id),
+    INDEX idx_cand_cert_credential (credential_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Reativar verificação de FK
 SET FOREIGN_KEY_CHECKS = 1;
 

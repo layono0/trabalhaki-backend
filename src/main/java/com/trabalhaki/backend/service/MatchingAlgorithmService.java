@@ -3,6 +3,7 @@ package com.trabalhaki.backend.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.trabalhaki.backend.domain.enums.SkillType;
 import com.trabalhaki.backend.domain.enums.WorkModality;
+import com.trabalhaki.backend.domain.model.CandidateCertificate;
 import com.trabalhaki.backend.domain.model.CandidateProfile;
 import com.trabalhaki.backend.domain.model.CandidateSkill;
 import com.trabalhaki.backend.domain.model.Job;
@@ -35,8 +36,9 @@ public class MatchingAlgorithmService {
         double experienceScore = evaluateExperience(job, candidate, explanation);
         double salaryScore = evaluateSalary(job, candidate, explanation);
         double modalityLocationScore = evaluateModalityAndLocation(job, candidate, explanation);
+        int priorityBonus = calculatePriorityBonus(job, candidate, explanation);
 
-        double totalScore = skillsScore + experienceScore + salaryScore + modalityLocationScore;
+        double totalScore = skillsScore + experienceScore + salaryScore + modalityLocationScore + priorityBonus;
         int normalizedScore = (int) Math.round(Math.max(0, Math.min(100, totalScore)));
 
         String jsonExplanation = "{}";
@@ -47,6 +49,57 @@ public class MatchingAlgorithmService {
         }
 
         return new CompatibilityResult(normalizedScore, explanation, jsonExplanation);
+    }
+
+    public int calculatePriorityBonus(Job job, CandidateProfile candidate, Map<String, String> explanation) {
+        List<CandidateCertificate> certificates = candidate.getCertificates();
+        if (certificates == null || certificates.isEmpty()) {
+            return 0;
+        }
+
+        Set<String> jobSkillNames = job.getSkills() == null ? Set.of() :
+                job.getSkills().stream()
+                        .filter(js -> js.getSkill() != null)
+                        .map(js -> js.getSkill().getName().trim().toLowerCase())
+                        .collect(Collectors.toSet());
+
+        int totalBonus = 0;
+        Set<String> matchedSkillsForExplanation = new LinkedHashSet<>();
+
+        for (CandidateCertificate cert : certificates) {
+            int certBonus = cert.getPriorityBonus() != null ? cert.getPriorityBonus() : 0;
+            if (certBonus <= 0) {
+                continue;
+            }
+            List<String> certSkills = cert.getVerifiedSkillsList();
+            List<String> matched = certSkills.stream()
+                    .filter(s -> jobSkillNames.contains(s.trim().toLowerCase()))
+                    .toList();
+
+            if (!matched.isEmpty()) {
+                totalBonus += certBonus;
+                matchedSkillsForExplanation.addAll(matched);
+            } else {
+                totalBonus += Math.min(2, Math.max(1, certBonus / 2));
+                matchedSkillsForExplanation.addAll(certSkills);
+            }
+        }
+
+        int cappedBonus = Math.min(12, totalBonus);
+        if (cappedBonus > 0 && explanation != null) {
+            String skillsSummary = matchedSkillsForExplanation.isEmpty()
+                    ? "certificado verificado"
+                    : String.join(", ", matchedSkillsForExplanation);
+            explanation.put(
+                    "certificates",
+                    String.format(
+                            "Competências verificadas por certificado (%s): +%d pts de prioridade na fila",
+                            skillsSummary,
+                            cappedBonus
+                    )
+            );
+        }
+        return cappedBonus;
     }
 
     private double evaluateSkills(Job job, CandidateProfile candidate, Map<String, String> explanation) {

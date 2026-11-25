@@ -167,6 +167,19 @@ public class CandidateProfileService {
             }
         }
 
+        List<String> verifiedSkills = profile.getCertificates() == null ? List.of() :
+                profile.getCertificates().stream()
+                        .flatMap(cert -> cert.getVerifiedSkillsList().stream())
+                        .distinct()
+                        .toList();
+
+        int priorityBonusTotal = profile.getCertificates() == null ? 0 :
+                Math.min(12, profile.getCertificates().stream()
+                        .mapToInt(cert -> cert.getPriorityBonus() != null ? cert.getPriorityBonus() : 0)
+                        .sum());
+
+        int verifiedCertsCount = profile.getCertificates() == null ? 0 : profile.getCertificates().size();
+
         return new CandidateProfileResponse(
                 profile.getId(),
                 profile.getUser().getId(),
@@ -185,7 +198,10 @@ public class CandidateProfileService {
                 profile.getCompletionPercentage(),
                 skillNames,
                 profile.getCreatedAt(),
-                profile.getUpdatedAt()
+                profile.getUpdatedAt(),
+                verifiedSkills,
+                priorityBonusTotal,
+                verifiedCertsCount
         );
     }
 }

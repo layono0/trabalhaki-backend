@@ -196,10 +196,16 @@ public class RecommendationService {
             }
 
             CompatibilityResult compatibility = matchingAlgorithmService.calculateCompatibility(job, candidate);
+            int priorityBonus = matchingAlgorithmService.calculatePriorityBonus(job, candidate, new java.util.LinkedHashMap<>());
             List<String> skillNames = candidate.getSkills() == null ? List.of() :
                     candidate.getSkills().stream()
                             .filter(cs -> cs.getSkill() != null)
                             .map(cs -> cs.getSkill().getName())
+                            .toList();
+            List<String> verifiedSkills = candidate.getCertificates() == null ? List.of() :
+                    candidate.getCertificates().stream()
+                            .flatMap(cert -> cert.getVerifiedSkillsList().stream())
+                            .distinct()
                             .toList();
 
             applicants.add(new JobApplicantResponse(
@@ -220,12 +226,15 @@ public class RecommendationService {
                     skillNames,
                     compatibility.score(),
                     compatibility.explanation(),
-                    like.getCreatedAt()
+                    like.getCreatedAt(),
+                    verifiedSkills,
+                    priorityBonus
             ));
         }
 
         applicants.sort(
                 Comparator.comparingInt(JobApplicantResponse::compatibilityScore).reversed()
+                        .thenComparing(Comparator.comparingInt(JobApplicantResponse::priorityBonus).reversed())
                         .thenComparing(JobApplicantResponse::appliedAt, Comparator.nullsLast(Comparator.reverseOrder()))
         );
         return applicants;

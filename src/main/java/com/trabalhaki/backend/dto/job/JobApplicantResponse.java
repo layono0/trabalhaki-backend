@@ -25,5 +25,7 @@ public record JobApplicantResponse(
         List<String> skills,
         int compatibilityScore,
         Map<String, String> explanation,
-        LocalDateTime appliedAt
+        LocalDateTime appliedAt,
+        List<String> verifiedSkills,
+        int priorityBonus
 ) {}
